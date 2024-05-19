@@ -41,12 +41,13 @@ echo -e "\n\n"
 
 }
 
+
 # get json from the url
 fetch_json() {
     local url="$1"
     curl --silent --fail "$url"
     if [[ $? -ne 0 ]]; then
-        echo -e "\e[1;31mFailed to get any data from $url. Please chack if you have interet connection and try again.\e[0m"
+        echo -e "\e[1;31mFailed to get any data from $url. Please check if you have an internet connection and try again.\e[0m"
         exit 1
     fi
 }
@@ -61,8 +62,71 @@ fetch_unraid_branches() {
 # get the versions for said branch
 fetch_unraid_versions() {
     local branch_url="$1"
-    echo "Getting the available Unraid versions for your choosen branch..."
+    echo "Getting the available Unraid versions for your chosen branch..."
     unraid_versions=$(fetch_json "$branch_url")
+}
+
+# upload to restore from backup
+upload_to_restore() {
+    echo -e "\e[1;34mPlease choose how you want to provide the backup file link:\e[0m"
+    echo -e "1. Upload flash backup to Dropbox and enter the public link"
+    echo -e "2. Direct URL (Make sure to test the URL in a browser first to ensure it works before using it here)"
+
+    local valid=false
+    local choice
+    while [[ $valid == false ]]; do
+        echo -e "\e[1;32mEnter the number of your choice (1 or 2):\e[0m"
+        read -r choice
+
+        if [[ "$choice" == "1" || "$choice" == "2" ]]; then
+            valid=true
+        else
+            echo -e "\e[1;31mInvalid choice. Please enter 1 or 2.\e[0m"
+        fi
+    done
+
+    valid=false
+    while [[ $valid == false ]]; do
+        if [[ "$choice" == "1" ]]; then
+            echo -e "\e[1;32mEnter the Dropbox public link:\e[0m"
+            read -r dropbox_link
+
+            if [[ "$dropbox_link" =~ ^https://www\.dropbox\.com/scl/fi/([^/]+)/([^?]+)\?(.+)$ ]]; then
+                file_id="${BASH_REMATCH[1]}"
+                file_name="${BASH_REMATCH[2]}"
+                query_params="${BASH_REMATCH[3]}"
+                download_url="https://dl.dropboxusercontent.com/scl/fi/${file_id}/${file_name}?${query_params}"
+                if curl --output /dev/null --silent --head --fail "$download_url"; then
+                    valid=true
+                    echo -e "\e[1;32mValid Dropbox link provided.\e[0m"
+                    unraid_download_url="$download_url"
+                else
+                    echo -e "\e[1;31mThe URL does not resolve. Please check the URL and try again.\e[0m"
+                fi
+            else
+                echo -e "\e[1;31mInvalid Dropbox link format. Please ensure it follows the correct format.\e[0m"
+            fi
+        elif [[ "$choice" == "2" ]]; then
+            echo -e "\e[1;32mEnter the direct download URL (Make sure to test the URL in a browser first to ensure it works):\e[0m"
+            read -r download_url
+
+            if [[ "$download_url" =~ ^https?://.+\.zip$ ]]; then
+                if curl --output /dev/null --silent --head --fail "$download_url"; then
+                    valid=true
+                    echo -e "\e[1;32mValid URL provided.\e[0m"
+                    unraid_download_url="$download_url"
+                else
+                    echo -e "\e[1;31mThe URL does not resolve. Please check the URL and try again.\e[0m"
+                fi
+            else
+                echo -e "\e[1;31mInvalid URL format. Please ensure it is a direct link to a zip file and starts with http:// or https://\e[0m"
+            fi
+        fi
+    done
+
+    echo -e "\e[1;32mProceeding to restore\e[0m"
+    echo ""
+    echo ""
 }
 
 # get user to choose branch
@@ -74,29 +138,40 @@ select_branch() {
         branches_count=$(echo "$branches_list" | wc -l)
 
         echo "$branches_list"
+        echo "9: Upload and restore from backup"
 
-        echo -e "\e[1;32mEnter the number of the Unraid branch you wish to see Unraid versions from:\e[0m "
+        echo -e "\e[1;32mEnter the number of the Unraid branch you wish to see Unraid versions from, or 9 to upload and restore from backup:\e[0m"
         read -r branch_index
 
-        if [[ $branch_index =~ ^[0-9]+$ ]] && [[ $branch_index -ge 1 ]] && [[ $branch_index -le $branches_count ]]; then
-            selected_branch_index=$((branch_index - 1))
-            branch_name=$(echo "$branches_list" | sed -n "$branch_index p" | cut -d ':' -f 2 | xargs)  # trim whitespace
-            branch_url=$(echo "$unraid_branches" | jq -r --arg name "$branch_name" '.[] | select(.name == $name) | .url')
-
-            if [[ "$branch_url" =~ ^https?://.+ ]]; then
-                fetch_unraid_versions "$branch_url"
-                if [[ $(echo "$unraid_versions" | jq length) -eq 0 ]]; then
-                    echo -e "\e[1;31mThe branch '$branch_name' currently has no versions to download. Please select another branch.\e[0m"
-                    echo ""
-                    echo ""
-                else
-                    valid=true
-                    echo ""
-                    echo ""
-                    echo -e "\e[1;32mSelected branch -- \e[0;33m$branch_name\e[0m"
-                fi
+        if [[ $branch_index =~ ^[0-9]+$ ]] && ([[ $branch_index -ge 1 ]] && [[ $branch_index -le $branches_count ]] || [[ $branch_index -eq 9 ]]); then
+            if [[ $branch_index -eq 9 ]]; then
+                # Set a flag to indicate upload and restore
+                restore_from_backup=true
+                valid=true
+                branch_name="Restore from Backup"
+                branch_url=""
+                echo ""
+                echo -e "\e[1;32mSelected branch -- \e[0;33m$branch_name\e[0m"
             else
-                echo -e "\e[1;31mInvalid branch URL format. Please check the URL and try again.\e[0m"
+                selected_branch_index=$((branch_index - 1))
+                branch_name=$(echo "$branches_list" | sed -n "$branch_index p" | cut -d ':' -f 2 | xargs)  # trim whitespace
+                branch_url=$(echo "$unraid_branches" | jq -r --arg name "$branch_name" '.[] | select(.name == $name) | .url')
+
+                if [[ "$branch_url" =~ ^https?://.+ ]]; then
+                    fetch_unraid_versions "$branch_url"
+                    if [[ $(echo "$unraid_versions" | jq length) -eq 0 ]]; then
+                        echo -e "\e[1;31mThe branch '$branch_name' currently has no versions to download. Please select another branch.\e[0m"
+                        echo ""
+                        echo ""
+                    else
+                        valid=true
+                        echo ""
+                        echo ""
+                        echo -e "\e[1;32mSelected branch -- \e[0;33m$branch_name\e[0m"
+                    fi
+                else
+                    echo -e "\e[1;31mInvalid branch URL format. Please check the URL and try again.\e[0m"
+                fi
             fi
         else
             echo -e "\e[1;31mInvalid selection. Please enter a valid number.\e[0m"
@@ -107,6 +182,11 @@ select_branch() {
 
 # get user to choose version from said branch
 select_version() {
+    if [[ "$restore_from_backup" == true ]]; then
+        upload_to_restore
+        return
+    fi
+
     echo -e "\e[1;34mAvailable Unraid versions in the $branch_name branch:\e[0m"
     versions_list=$(echo "$unraid_versions" | jq -r '. | to_entries | .[] | "\(.key + 1): \(.value.name)"')
     versions_count=$(echo "$versions_list" | wc -l)
@@ -115,7 +195,7 @@ select_version() {
 
     local valid=false
     while [[ $valid == false ]]; do
-        echo -e "\e[1;32mEnter the number of the Unraid version you wish to install:\e[0m "
+        echo -e "\e[1;32mEnter the number of the Unraid version you wish to install:\e[0m"
         read -r version_index
 
         if [[ $version_index =~ ^[0-9]+$ ]] && [[ $version_index -ge 1 ]] && [[ $version_index -le $versions_count ]]; then
@@ -137,6 +217,7 @@ select_version() {
     done
 }
 
+# get url of what to download
 prompt_for_url() {
     fetch_unraid_branches
     select_branch
@@ -153,7 +234,7 @@ select_usb_drive() {
 
     for drive in $(lsblk -S | grep -i "usb" | awk '{print $1, $4, $6}'); do
         local device_name=$(echo $drive | awk '{print $1}')
-        echo -e "\e[1;36m$count) $drive\e[0m"
+        echo -e "$count: $drive"
         choices+=("/dev/$device_name")
         descriptions+=("$drive")
         let count+=1
@@ -170,7 +251,7 @@ select_usb_drive() {
         read selection
         if [[ $selection -ge 1 && $selection -le ${#choices[@]} ]]; then
             flash_drive=${choices[$((selection-1))]}
-            echo -e "\e[1;33mYou selected ${descriptions[$((selection-1))]}\e[0m"
+            echo -e "\e[1;32mYou selected \e[38;5;208m${descriptions[$((selection-1))]}\e[0m"
             break
         else
             echo -e "\e[1;31mInvalid selection. Please choose a valid number.\e[0m"
@@ -188,7 +269,6 @@ select_usb_drive() {
     echo ""
     echo ""
 }
-
 
 # check and install dependencies
 check_dependencies() {
@@ -296,7 +376,7 @@ download_unraid() {
     echo ""
 }
 
-# check if the server  is booted in EFI or Legacy mode
+# check if the server is booted in EFI or Legacy mode
 legacy_efi() {
     if [ -d /sys/firmware/efi ]; then
         echo -e "\e[1;34mCurrently, your server is booted in EFI mode (you will need to allow EFI boot later in the process).\e[0m"
@@ -397,4 +477,3 @@ format_flash
 download_unraid
 ensure_unmounted
 make_bootable
-
