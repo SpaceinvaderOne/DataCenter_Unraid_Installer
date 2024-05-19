@@ -234,7 +234,7 @@ select_usb_drive() {
 
     for drive in $(lsblk -S | grep -i "usb" | awk '{print $1, $4, $6}'); do
         local device_name=$(echo $drive | awk '{print $1}')
-        echo -e "\e[1;36m$count) $drive\e[0m"
+        echo -e "$count: $drive"
         choices+=("/dev/$device_name")
         descriptions+=("$drive")
         let count+=1
@@ -251,7 +251,7 @@ select_usb_drive() {
         read selection
         if [[ $selection -ge 1 && $selection -le ${#choices[@]} ]]; then
             flash_drive=${choices[$((selection-1))]}
-            echo -e "\e[1;33mYou selected ${descriptions[$((selection-1))]}\e[0m"
+            echo -e "\e[1;32mYou selected \e[38;5;208m${descriptions[$((selection-1))]}\e[0m"
             break
         else
             echo -e "\e[1;31mInvalid selection. Please choose a valid number.\e[0m"
@@ -269,6 +269,7 @@ select_usb_drive() {
     echo ""
     echo ""
 }
+
 
 
 # check and install dependencies
