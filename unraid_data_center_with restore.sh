@@ -68,9 +68,9 @@ fetch_unraid_versions() {
 
 # upload to restore from backup
 upload_to_restore() {
-    echo -e "\e[1;32mPlease choose how you want to provide the backup file link:\e[0m"
-    echo -e "\e[1;32m1. Upload flash backup to Dropbox and enter the public link\e[0m"
-    echo -e "\e[1;32m2. Direct URL (Make sure to test the URL in a browser first to ensure it works before using it here)\e[0m"
+    echo -e "\e[1;34mPlease choose how you want to provide the backup file link:\e[0m"
+    echo -e "1. Upload flash backup to Dropbox and enter the public link"
+    echo -e "2. Direct URL (Make sure to test the URL in a browser first to ensure it works before using it here)"
 
     local valid=false
     local choice
@@ -91,10 +91,11 @@ upload_to_restore() {
             echo -e "\e[1;32mEnter the Dropbox public link:\e[0m"
             read -r dropbox_link
 
-            if [[ "$dropbox_link" =~ ^https://www\.dropbox\.com/s/([^/]+)/(.+)\?dl=0$ ]]; then
+            if [[ "$dropbox_link" =~ ^https://www\.dropbox\.com/scl/fi/([^/]+)/([^?]+)\?(.+)$ ]]; then
                 file_id="${BASH_REMATCH[1]}"
                 file_name="${BASH_REMATCH[2]}"
-                download_url="https://dl.dropboxusercontent.com/s/${file_id}/${file_name}"
+                query_params="${BASH_REMATCH[3]}"
+                download_url="https://dl.dropboxusercontent.com/scl/fi/${file_id}/${file_name}?${query_params}"
                 if curl --output /dev/null --silent --head --fail "$download_url"; then
                     valid=true
                     echo -e "\e[1;32mValid Dropbox link provided.\e[0m"
@@ -123,8 +124,11 @@ upload_to_restore() {
         fi
     done
 
-    echo -e "\e[1;32mYou can now proceed with downloading and restoring the backup from: \e[0;33m$unraid_download_url\e[0m"
+    echo -e "\e[1;32mProceeding to restore\e[0m"
+    echo ""
+    echo ""
 }
+
 
 
 
