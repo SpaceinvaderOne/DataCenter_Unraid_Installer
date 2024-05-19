@@ -129,9 +129,6 @@ upload_to_restore() {
     echo ""
 }
 
-
-
-
 # get user to choose branch
 select_branch() {
     local valid=false
@@ -153,6 +150,8 @@ select_branch() {
                 valid=true
                 branch_name="Restore from Backup"
                 branch_url=""
+                echo ""
+                echo -e "\e[1;32mSelected branch -- \e[0;33m$branch_name\e[0m"
             else
                 selected_branch_index=$((branch_index - 1))
                 branch_name=$(echo "$branches_list" | sed -n "$branch_index p" | cut -d ':' -f 2 | xargs)  # trim whitespace
@@ -179,6 +178,7 @@ select_branch() {
         fi
     done
 }
+
 
 # get user to choose version from said branch
 select_version() {
