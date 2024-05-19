@@ -69,8 +69,8 @@ fetch_unraid_versions() {
 # upload to restore from backup
 upload_to_restore() {
     echo -e "\e[1;32mPlease choose how you want to provide the backup file link:\e[0m"
-    echo -e "\e[1;32m1. Direct URL\e[0m"
-    echo -e "\e[1;32m2. Google Drive link\e[0m"
+    echo -e "\e[1;32m1. Upload flash backup to Dropbox and enter the public link\e[0m"
+    echo -e "\e[1;32m2. Direct URL (Make sure to test the URL in a browser first to ensure it works before using it here)\e[0m"
 
     local valid=false
     local choice
@@ -88,7 +88,25 @@ upload_to_restore() {
     valid=false
     while [[ $valid == false ]]; do
         if [[ "$choice" == "1" ]]; then
-            echo -e "\e[1;32mEnter the direct download URL:\e[0m"
+            echo -e "\e[1;32mEnter the Dropbox public link:\e[0m"
+            read -r dropbox_link
+
+            if [[ "$dropbox_link" =~ ^https://www\.dropbox\.com/s/([^/]+)/(.+)\?dl=0$ ]]; then
+                file_id="${BASH_REMATCH[1]}"
+                file_name="${BASH_REMATCH[2]}"
+                download_url="https://dl.dropboxusercontent.com/s/${file_id}/${file_name}"
+                if curl --output /dev/null --silent --head --fail "$download_url"; then
+                    valid=true
+                    echo -e "\e[1;32mValid Dropbox link provided.\e[0m"
+                    unraid_download_url="$download_url"
+                else
+                    echo -e "\e[1;31mThe URL does not resolve. Please check the URL and try again.\e[0m"
+                fi
+            else
+                echo -e "\e[1;31mInvalid Dropbox link format. Please ensure it follows the correct format.\e[0m"
+            fi
+        elif [[ "$choice" == "2" ]]; then
+            echo -e "\e[1;32mEnter the direct download URL (Make sure to test the URL in a browser first to ensure it works):\e[0m"
             read -r download_url
 
             if [[ "$download_url" =~ ^https?://.+\.zip$ ]]; then
@@ -102,40 +120,12 @@ upload_to_restore() {
             else
                 echo -e "\e[1;31mInvalid URL format. Please ensure it is a direct link to a zip file and starts with http:// or https://\e[0m"
             fi
-        elif [[ "$choice" == "2" ]]; then
-            echo -e "\e[1;32mEnter the Google Drive link:\e[0m"
-            read -r gdrive_url
-
-            if [[ "$gdrive_url" =~ ^https://drive.google.com/ ]]; then
-                file_id=$(echo "$gdrive_url" | grep -o '[-\w]\{25,\}')
-                if [[ -n "$file_id" ]]; then
-                    download_url="https://drive.google.com/uc?export=download&id=$file_id"
-                    confirm_url="https://drive.google.com/uc?export=download&confirm=t&id=$file_id"
-                    
-                    if curl --output /dev/null --silent --head --fail "$confirm_url"; then
-                        valid=true
-                        echo -e "\e[1;32mValid Google Drive link provided.\e[0m"
-                        unraid_download_url="$confirm_url"
-                    elif curl --output /dev/null --silent --head --fail "$download_url"; then
-                        valid=true
-                        echo -e "\e[1;32mValid Google Drive link provided.\e[0m"
-                        unraid_download_url="$download_url"
-                    else
-                        echo -e "\e[1;31mThe Google Drive link does not resolve. Please check the link and try again.\e[0m"
-                    fi
-
-                    echo -e "\e[1;32mExtracted Google Drive link: \e[0;33m$download_url\e[0m"
-                else
-                    echo -e "\e[1;31mInvalid Google Drive link. Please ensure it is a valid Google Drive share link.\e[0m"
-                fi
-            else
-                echo -e "\e[1;31mInvalid URL format. Please ensure it is a Google Drive link and starts with https://drive.google.com/\e[0m"
-            fi
         fi
     done
 
     echo -e "\e[1;32mYou can now proceed with downloading and restoring the backup from: \e[0;33m$unraid_download_url\e[0m"
 }
+
 
 
 # get user to choose branch
