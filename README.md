@@ -56,7 +56,7 @@ If you are not root user you must use sudo
 
 -   If you cannot access the Unraid GUI after reboot, check the server's boot settings to ensure it is set to boot from USB. You may need to contact data center support for help or book a KVM session to adjust the boot settings manually.
 
--   To restore your Unraid flashdrive on your data center server. When asked to choose branch select 9: Upload and restore from backu. You will be asked for a link for the script to download the zip file.
+-   To restore your Unraid flashdrive on your data center server. When asked to choose branch select 9: Upload and restore from backup. You will be asked for a link for the script to download the zip file.
 choose 1 to user Dropbox link. Upload your zip backup to Dropbox and copy the public link and paste link when asked.
 choose 2 to use a direct link to zip file (test this in a browser first to check file downloads) 
 Currently only cloud storage supported is Dropbox. 
